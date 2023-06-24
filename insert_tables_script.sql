@@ -36,13 +36,26 @@ JOIN public.shipping_transfer AS st ON shipping_all.std[2] = st.transfer_model A
 JOIN public.shipping_country_rates AS scr ON shipping_all.shipping_country = scr.shipping_country
 JOIN public.shipping_agreement AS sa ON shipping_all.vad[1]::SMALLINT = sa.agreement_id;
 
+--изменено
 INSERT INTO public.shipping_status (shipping_id, status, state,
 						shipping_start_fact_datetime, shipping_end_fact_datetime)
-WITH ti AS (
-	SELECT shippingid, MIN(state_datetime) AS shipping_start_fact_datetime, MAX(state_datetime) AS shipping_end_fact_datetime 
-	FROM public.shipping
-	GROUP BY shippingid
+WITH min_state_datetime AS (
+  SELECT shippingid,
+  MIN(state_datetime) AS shipping_start_fact_datetime,
+  MAX(state_datetime) AS max_datetime
+  FROM shipping
+  GROUP BY shippingid
+),
+recived_state_datetime AS (
+SELECT shippingid,
+		MIN(state_datetime) AS shipping_end_fact_datetime
+FROM public.shipping
+WHERE state = 'recieved'
+GROUP BY shippingid
 )
-SELECT ti.shippingid, status, state,
-shipping_start_fact_datetime, shipping_end_fact_datetime 
-FROM ti LEFT JOIN public.shipping AS s ON ti.shipping_end_fact_datetime=s.state_datetime;
+SELECT mdt.shippingid, status, state,
+shipping_start_fact_datetime, shipping_end_fact_datetime
+FROM min_state_datetime AS mdt
+LEFT JOIN public.shipping AS s ON mdt.shippingid=s.shippingid
+LEFT JOIN recived_state_datetime AS rsd ON mdt.shippingid=rsd.shippingid
+WHERE state_datetime = max_datetime
